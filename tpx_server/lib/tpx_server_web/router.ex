@@ -27,6 +27,9 @@ defmodule TpxServerWeb.Router do
     post "/upload", UploadController, :create
 
     post "/groups", GroupController, :create
+    get "/groups/me", GroupController, :list_my
+    post "/groups/:id/join", GroupController, :join
+    post "/groups/join_by_name", GroupController, :join_by_name
     post "/groups/:id/add", GroupController, :add
     post "/groups/:id/kick", GroupController, :kick
     post "/groups/:id/ban", GroupController, :ban
@@ -39,6 +42,7 @@ defmodule TpxServerWeb.Router do
     post "/messages/send", MessageController, :send_to_group
 
     post "/dm", DMController, :create
+    get "/dm/me", DMController, :list_mine
     post "/dm/:id/send", DMController, :send
     get "/dm/:id/messages", DMController, :list
     get "/dm/:id/messages/pinned", DMController, :list_pinned

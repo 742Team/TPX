@@ -3,6 +3,7 @@ defmodule TpxServerWeb.UserSocket do
 
   channel "group:*", TpxServerWeb.GroupChannel
   channel "dm:*", TpxServerWeb.DMChannel
+  channel "user:*", TpxServerWeb.UserChannel
 
   def connect(%{"token" => token}, socket, _connect_info) do
     case Phoenix.Token.verify(TpxServerWeb.Endpoint, "user_auth", token, max_age: 7 * 24 * 3600) do

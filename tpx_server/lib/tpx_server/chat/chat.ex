@@ -9,11 +9,25 @@ defmodule TpxServer.Chat do
   def create_group(owner_id, attrs) do
     attrs =
       Map.merge(%{"owner_id" => owner_id, "members" => [owner_id], "admins" => [owner_id]}, attrs)
+      |> maybe_put_join_hash()
 
     %Group{} |> Group.create_changeset(attrs) |> Repo.insert()
   end
 
   def get_group(id), do: Repo.get(Group, id)
+
+  def get_group_by_name(name) do
+    from(g in Group, where: ilike(g.name, ^name), order_by: [asc: g.inserted_at], limit: 1)
+    |> Repo.one()
+  end
+
+  def list_user_groups(user_id) do
+    from(g in Group,
+      where: fragment("? = ANY(?)", type(^user_id, :binary_id), g.members),
+      order_by: [asc: g.inserted_at]
+    )
+    |> Repo.all()
+  end
 
   def update_group(%Group{} = group, attrs) do
     group |> Ecto.Changeset.change(to_atom_keys(attrs)) |> Repo.update()
@@ -333,4 +347,10 @@ defmodule TpxServer.Chat do
       Map.put(acc, if(is_binary(k), do: String.to_atom(k), else: k), v)
     end)
   end
+
+  defp maybe_put_join_hash(%{"join_password" => pw} = attrs) when is_binary(pw) and pw != "" do
+    Map.put(attrs, "join_password_hash", Bcrypt.hash_pwd_salt(pw))
+  end
+
+  defp maybe_put_join_hash(attrs), do: attrs
 end

@@ -2,6 +2,7 @@ defmodule TpxServerWeb.GroupChannel do
   use Phoenix.Channel
   alias TpxServerWeb.Presence
   alias TpxServer.Chat
+  alias TpxServer.Accounts
 
   def join("group:" <> group_id, _payload, socket) do
     case socket.assigns[:user_id] do
@@ -44,10 +45,22 @@ defmodule TpxServerWeb.GroupChannel do
                content: %{"text" => text}
              }) do
           {:ok, msg} ->
+            su = Accounts.get_user(socket.assigns[:user_id])
+            sender_disp = (su && su.display_name) || nil
+            sender_photo = (su && su.photo) || nil
+            sender_username = (su && su.username) || nil
+
             broadcast(
               socket,
               "msg",
-              Map.merge(payload, %{"at" => System.system_time(:millisecond), "id" => msg.id})
+              Map.merge(payload, %{
+                "at" => System.system_time(:millisecond),
+                "id" => msg.id,
+                "sender_id" => socket.assigns[:user_id],
+                "sender_display_name" => sender_disp,
+                "sender_photo" => sender_photo,
+                "sender_username" => sender_username
+              })
             )
 
             {:noreply, socket}

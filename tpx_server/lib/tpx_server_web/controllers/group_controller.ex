@@ -7,12 +7,54 @@ defmodule TpxServerWeb.GroupController do
 
     case Chat.create_group(
            owner.id,
-           Map.take(params, ["name", "description", "photo", "messages_retention"])
+           Map.take(params, ["name", "description", "photo", "messages_retention", "join_password"])
          ) do
       {:ok, group} -> json(conn, %{ok: true, id: group.id})
       {:error, _} -> conn |> put_status(422) |> json(%{ok: false})
     end
   end
+
+  def list_my(conn, _params) do
+    user = conn.assigns.current_user
+    groups = Chat.list_user_groups(user.id)
+    json(conn, %{ok: true, groups: Enum.map(groups, fn g -> %{id: g.id, name: g.name, photo: g.photo, description: g.description} end)})
+  end
+
+  def join(conn, %{"id" => id} = params) do
+    user = conn.assigns.current_user
+    pass = Map.get(params, "password")
+
+    with group when not is_nil(group) <- Chat.get_group(id),
+         false <- user.id in group.banned_users,
+         true <- allow_join?(group, pass),
+         {:ok, _} <- Chat.add_member(group, user.id) do
+      json(conn, %{ok: true})
+    else
+      true -> conn |> put_status(403) |> json(%{ok: false})
+      false -> conn |> put_status(403) |> json(%{ok: false})
+      _ -> conn |> put_status(404) |> json(%{ok: false})
+    end
+  end
+
+  def join_by_name(conn, %{"name" => name} = params) do
+    user = conn.assigns.current_user
+    pass = Map.get(params, "password")
+
+    with group when not is_nil(group) <- Chat.get_group_by_name(name),
+         false <- user.id in group.banned_users,
+         true <- allow_join?(group, pass),
+         {:ok, _} <- Chat.add_member(group, user.id) do
+      json(conn, %{ok: true, id: group.id})
+    else
+      true -> conn |> put_status(403) |> json(%{ok: false})
+      false -> conn |> put_status(403) |> json(%{ok: false})
+      _ -> conn |> put_status(404) |> json(%{ok: false})
+    end
+  end
+
+  defp allow_join?(%{join_password_hash: nil}, _pass), do: true
+  defp allow_join?(%{join_password_hash: hash}, pass) when is_binary(pass), do: Bcrypt.verify_pass(pass, hash)
+  defp allow_join?(%{join_password_hash: _}, _), do: false
 
   def add(conn, %{"id" => id, "user_id" => user_id}) do
     user = conn.assigns.current_user

@@ -1,10 +1,12 @@
 defmodule TpxServerWeb.MessageController do
   use TpxServerWeb, :controller
   alias TpxServer.Chat
+  alias TpxServer.Accounts
 
   def send_to_group(conn, %{"group_id" => group_id, "type" => type} = params) do
     user = conn.assigns.current_user
     content = Map.get(params, "content", %{})
+    text = Map.get(content, "text")
 
     case Chat.get_group(group_id) do
       nil ->
@@ -12,7 +14,24 @@ defmodule TpxServerWeb.MessageController do
 
       group ->
         case Chat.send_message(user.id, group, %{type: type, content: content}) do
-          {:ok, msg} -> json(conn, %{ok: true, id: msg.id})
+          {:ok, msg} ->
+            if type == "text" and is_binary(text) do
+              u = Accounts.get_user(user.id)
+              TpxServerWeb.Endpoint.broadcast(
+                "group:" <> group_id,
+                "msg",
+                %{
+                  "text" => text,
+                  "id" => msg.id,
+                  "at" => System.system_time(:millisecond),
+                  "sender_id" => user.id,
+                  "sender_display_name" => (u && u.display_name) || nil,
+                  "sender_photo" => (u && u.photo) || nil,
+                  "sender_username" => (u && u.username) || nil
+                }
+              )
+            end
+            json(conn, %{ok: true, id: msg.id})
           {:error, :forbidden} -> conn |> put_status(403) |> json(%{ok: false})
           {:error, _} -> conn |> put_status(422) |> json(%{ok: false})
         end
@@ -59,9 +78,13 @@ defmodule TpxServerWeb.MessageController do
   end
 
   defp serialize(m) do
+    user = if m.sender_id, do: Accounts.get_user(m.sender_id), else: nil
+
     %{
       id: m.id,
       sender_id: m.sender_id,
+      sender_display_name: (user && user.display_name) || nil,
+      sender_photo: (user && user.photo) || nil,
       group_id: m.group_id,
       type: m.type,
       content: m.content,

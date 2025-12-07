@@ -13,6 +13,7 @@ defmodule TpxServer.Chat.Group do
     field :members, {:array, :binary_id}, default: []
     field :banned_users, {:array, :binary_id}, default: []
     field :messages_retention, :integer
+    field :join_password_hash, :string
     timestamps()
   end
 
@@ -26,7 +27,8 @@ defmodule TpxServer.Chat.Group do
       :admins,
       :members,
       :banned_users,
-      :messages_retention
+      :messages_retention,
+      :join_password_hash
     ])
     |> validate_required([:name, :owner_id])
   end
