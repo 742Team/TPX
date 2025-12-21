@@ -11,6 +11,7 @@ defmodule TpxServerWeb.UserController do
       display_name: user.display_name,
       photo: user.photo,
       background: user.background,
+      header_background: user.header_background,
       status: user.status,
       public_key: user.public_key,
       blocked_users: user.blocked_users
@@ -35,6 +36,15 @@ defmodule TpxServerWeb.UserController do
     end
   end
 
+  def set_header_background(conn, %{"value" => value}) do
+    user = conn.assigns.current_user
+
+    case Accounts.update_header_background(user, value) do
+      {:ok, user} -> json(conn, %{ok: true, header_background: user.header_background})
+      {:error, _} -> conn |> put_status(422) |> json(%{ok: false})
+    end
+  end
+
   def set_status(conn, %{"status" => status}) do
     user = conn.assigns.current_user
 
@@ -49,6 +59,15 @@ defmodule TpxServerWeb.UserController do
 
     case Accounts.update_profile(user, %{display_name: value}) do
       {:ok, user} -> json(conn, %{ok: true, display_name: user.display_name})
+      {:error, _} -> conn |> put_status(422) |> json(%{ok: false})
+    end
+  end
+
+  def set_password(conn, %{"password" => password}) do
+    user = conn.assigns.current_user
+
+    case Accounts.update_password(user, password) do
+      {:ok, _} -> json(conn, %{ok: true})
       {:error, _} -> conn |> put_status(422) |> json(%{ok: false})
     end
   end

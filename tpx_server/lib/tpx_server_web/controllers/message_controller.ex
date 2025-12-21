@@ -15,6 +15,11 @@ defmodule TpxServerWeb.MessageController do
       group ->
         case Chat.send_message(user.id, group, %{type: type, content: content}) do
           {:ok, msg} ->
+            TpxServerWeb.Endpoint.broadcast(
+              "group:" <> group_id,
+              "message_created",
+              serialize(msg)
+            )
             if type == "text" and is_binary(text) do
               u = Accounts.get_user(user.id)
               TpxServerWeb.Endpoint.broadcast(
@@ -23,7 +28,7 @@ defmodule TpxServerWeb.MessageController do
                 %{
                   "text" => text,
                   "id" => msg.id,
-                  "at" => System.system_time(:millisecond),
+                  "inserted_at" => msg.inserted_at,
                   "sender_id" => user.id,
                   "sender_display_name" => (u && u.display_name) || nil,
                   "sender_photo" => (u && u.photo) || nil,
@@ -159,3 +164,4 @@ defmodule TpxServerWeb.MessageController do
     end
   end
 end
+  

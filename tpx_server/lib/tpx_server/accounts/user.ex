@@ -9,6 +9,7 @@ defmodule TpxServer.Accounts.User do
     field :display_name, :string
     field :photo, :string
     field :background, :string
+    field :header_background, :string
     field :status, :string, default: "offline"
     field :public_key, :string
     field :blocked_users, {:array, :binary_id}, default: []
@@ -24,6 +25,7 @@ defmodule TpxServer.Accounts.User do
       :display_name,
       :photo,
       :background,
+      :header_background,
       :status,
       :public_key,
       :blocked_users,
@@ -40,13 +42,20 @@ defmodule TpxServer.Accounts.User do
 
   def profile_changeset(user, attrs) do
     user
-    |> cast(attrs, [:display_name, :photo, :background])
+    |> cast(attrs, [:display_name, :photo, :background, :header_background])
   end
 
   def status_changeset(user, attrs) do
     user
     |> cast(attrs, [:status])
     |> validate_inclusion(:status, ["online", "offline", "custom"])
+  end
+
+  def password_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:password])
+    |> validate_length(:password, min: 6)
+    |> put_pass_hash()
   end
 
   defp put_pass_hash(changeset) do

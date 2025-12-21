@@ -40,6 +40,12 @@ defmodule TpxServer.Accounts do
     |> Repo.update()
   end
 
+  def update_header_background(user, value) do
+    user
+    |> User.profile_changeset(%{header_background: value})
+    |> Repo.update()
+  end
+
   def update_profile(user, attrs) do
     user
     |> User.profile_changeset(attrs)
@@ -49,6 +55,12 @@ defmodule TpxServer.Accounts do
   def update_status(user, status) do
     user
     |> User.status_changeset(%{status: status})
+    |> Repo.update()
+  end
+
+  def update_password(user, password) do
+    user
+    |> User.password_changeset(%{password: password})
     |> Repo.update()
   end
 

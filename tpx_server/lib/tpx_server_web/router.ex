@@ -20,8 +20,10 @@ defmodule TpxServerWeb.Router do
     get "/users/me", UserController, :me
     patch "/users/me/photo", UserController, :set_photo
     patch "/users/me/background", UserController, :set_background
+    patch "/users/me/header_background", UserController, :set_header_background
     patch "/users/me/status", UserController, :set_status
     patch "/users/me/display_name", UserController, :set_display_name
+    patch "/users/me/password", UserController, :set_password
     post "/users/block", UserController, :block
     post "/users/unblock", UserController, :unblock
     post "/upload", UploadController, :create

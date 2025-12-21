@@ -55,6 +55,7 @@ defmodule TpxServerWeb.GroupChannel do
               "msg",
               Map.merge(payload, %{
                 "at" => System.system_time(:millisecond),
+                "inserted_at" => msg.inserted_at,
                 "id" => msg.id,
                 "sender_id" => socket.assigns[:user_id],
                 "sender_display_name" => sender_disp,

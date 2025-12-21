@@ -15,5 +15,6 @@ defmodule TpxServer.Chat.DirectMessage do
     dm
     |> cast(attrs, [:user_a, :user_b])
     |> validate_required([:user_a, :user_b])
+    |> unique_constraint(:user_a, name: :direct_messages_user_a_user_b_index)
   end
 end

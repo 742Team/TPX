@@ -135,9 +135,15 @@ defmodule TpxServer.Chat do
 
     case Repo.get_by(DirectMessage, user_a: a, user_b: b) do
       nil ->
-        %DirectMessage{}
-        |> DirectMessage.create_changeset(%{user_a: a, user_b: b})
-        |> Repo.insert()
+        changeset = DirectMessage.create_changeset(%DirectMessage{}, %{user_a: a, user_b: b})
+        case Repo.insert(changeset) do
+          {:ok, dm} -> {:ok, dm}
+          {:error, _} ->
+            case Repo.get_by(DirectMessage, user_a: a, user_b: b) do
+              nil -> {:error, :conflict}
+              dm -> {:ok, dm}
+            end
+        end
 
       dm ->
         {:ok, dm}

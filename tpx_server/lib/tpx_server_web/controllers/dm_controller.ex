@@ -41,6 +41,11 @@ defmodule TpxServerWeb.DMController do
 
     case Chat.dm_send_message(me.id, id, %{type: type, content: content}) do
       {:ok, msg} ->
+        TpxServerWeb.Endpoint.broadcast(
+          "dm:" <> id,
+          "message_created",
+          serialize_enriched(msg, dm_users_map(id))
+        )
         text = Map.get(content, "text")
         if type == "text" and is_binary(text) do
           u = Accounts.get_user(me.id)
@@ -50,7 +55,7 @@ defmodule TpxServerWeb.DMController do
             %{
               "text" => text,
               "id" => msg.id,
-              "at" => System.system_time(:millisecond),
+              "inserted_at" => msg.inserted_at,
               "sender_id" => me.id,
               "sender_display_name" => (u && u.display_name) || nil,
               "sender_photo" => (u && u.photo) || nil,

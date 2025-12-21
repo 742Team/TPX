@@ -48,7 +48,7 @@ defmodule TpxServerWeb.DMChannel do
             broadcast(
               socket,
               "msg",
-              Map.merge(payload, %{"at" => System.system_time(:millisecond), "id" => msg.id})
+              Map.merge(payload, %{"at" => System.system_time(:millisecond), "inserted_at" => msg.inserted_at, "id" => msg.id})
             )
 
             {:noreply, socket}

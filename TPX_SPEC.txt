@@ -1,0 +1,276 @@
+SPECIFICATION TECHNIQUE – SYSTÈME DE MESSAGERIE “TPX”
+Backend : Elixir/Phoenix – Communication : WebSocket / TCP – Fronts : Electron Terminal & React Native Terminal
+
+============================================================
+1. OBJECTIF GÉNÉRAL
+============================================================
+Créer un service de communication ultra‑rapide, scalable, distribué, inspiré de BBM, basé sur :
+- Backend : Elixir + Phoenix + OTP + Cluster + Mnesia / Postgres + WebSockets natifs + canaux temps réel.
+- Communication core : protocole interne sur TCP + option WebSocket + file d’événements.
+- Front Desktop : Terminal graphique via Electron (style CLI avec UI minimale).
+- Front Mobile/Web : React Native transformé en terminal minimaliste pour répliquer le CLI.
+- Support complet des groupes, permissions, images, vidéos, messages vocaux, encryption.
+
+============================================================
+2. ARCHITECTURE BACKEND
+============================================================
+2.1 Langage & Framework
+- Elixir (OTP, GenServer, Supervisors, ETS, Mnesia).
+- Phoenix Framework pour WebSockets et API REST.
+- Phoenix Channels pour communication temps réel.
+- Phoenix Presence pour présence et statuts.
+- Broadway / GenStage pour traitement des jobs lourds (upload, conversion).
+- L’API interne TCP sera gérée par un superviseur dédié (Ranch ou ThousandIsland).
+
+2.2 Scalabilité
+- Phoenix en mode Cluster (libcluster).
+- Storage adaptatif :
+  - Métadonnées → Postgres.
+  - Messages chauds (récents) → ETS / Mnesia distribuée.
+  - Fichiers médias → MinIO / S3 / Object storage.
+- Load balancing par Nginx ou Caddy en HTTP/2 + WebSocket.
+- Support multi‑datacenter via réplication Mnesia (optionnel).
+
+2.3 Sécurité
+- End‑to‑end encryption optionnelle (basée sur libsodium).
+- Tokens : JWT + rotation + XSRF pour le terminal Electron.
+- Permissions :
+  - Owner de groupe,
+  - Admins,
+  - Utilisateurs,
+  - Utilisateurs bannis / exclus.
+- Audit logs pour actions critiques (bannissement, suppression de message).
+
+============================================================
+3. MODÈLE DE DONNÉES
+============================================================
+
+3.1 Utilisateur
+- id : UUID
+- username
+- display_name
+- photo (image/video)
+- background (image/video/couleur)
+- status (online, offline, custom)
+- public_key (si encryption E2E)
+- blocked_users : list<UUID>
+- created_at, updated_at
+
+3.2 Groupe
+- id : UUID
+- name
+- description
+- photo (image/video)
+- owner_id
+- admins : list<UUID>
+- members : list<UUID>
+- banned_users : list<UUID>
+- messages_retention : durée de conservation
+- created_at, updated_at
+
+3.3 Message
+- id : UUID
+- sender_id
+- group_id OU direct_message_id
+- type :
+    - text
+    - image
+    - video
+    - audio
+    - file
+    - system (notification)
+- content :
+    - texte échappé
+    - metadata médias : {url, content_type, size, duration}
+- encryption metadata
+- created_at
+- edited_at
+- deleted : bool
+
+3.4 Direct Message
+- id : UUID
+- user_a, user_b
+- last_message_at
+
+============================================================
+4. FONCTIONNALITÉS
+============================================================
+
+4.1 Utilisateur
+- Création de compte
+- Login via terminal (Electron ou RN)
+- Ajout photo/vidéo de profil
+- Blocage / déblocage utilisateurs
+- Statut : online, offline, custom
+- Suppression de compte
+- Gestion clés E2E
+
+4.2 Groupes
+- Créer un groupe
+- Ajouter/supprimer un membre
+- Bannir / débannir un utilisateur
+- Promouvoir admin
+- Définir photo/vidéo de groupe
+- Définir règles (retention messages, permissions, upload max)
+- Quitter un groupe
+
+4.3 Chat / Messaging
+- Envoi message texte
+- Envoi images (thumb + original)
+- Envoi vidéos (thumbnail + transcoding job)
+- Messages vocaux + visualisation waveform
+- Upload fichiers (limite configurable)
+- Édition message
+- Suppression message
+- Indicateurs live (typing, en ligne)
+- Historique partiel côté client (cache)
+
+4.4 Notifications système
+- Nouveau membre
+- Membre quitte
+- Admin change
+- Image/vidéo de groupe mise à jour
+- Message supprimé/édité
+
+4.5 Terminal (Electron CLI)
+- Interface type terminal stylisé
+- Commandes interactives :
+    /login
+    /logout
+    /dm <user>
+    /group create <name>
+    /join <group_id>
+    /leave <group_id>
+    /admin promote <user>
+    /ban <user>
+    /unban <user>
+    /msg <text>
+    /upload <path>
+    /profile set-photo <path>
+- Affichage live des flux messages comme un IRC moderne
+
+4.6 Application React Native (Terminal Mobile)
+- Reproduction quasi identique du terminal Electron
+- Touch gestures façon CLI mobile
+- Sync notifications push
+- Lecture vidéo et image dans un viewer séparé
+- Micro pour notes vocales
+
+============================================================
+5. SYSTÈME DE STOCKAGE MÉDIA
+============================================================
+- Serveur d’upload dédié (Phoenix + Plug Upload)
+- Stockage objet MinIO (self‑hosted)
+- Génération automatique :
+  - Thumbnails d’images
+  - Thumbnails vidéo + transcoding (FFmpeg en tâche background)
+  - Compression audio
+- URLs signées (sécurisées 30s)
+
+============================================================
+6. PROTOCOLE TEMPS RÉEL
+============================================================
+
+6.1 WebSocket
+- Phoenix Channels : topic par groupe : "group:<id>"
+- Direct messages : "dm:<id>"
+
+6.2 TCP interne (plus rapide)
+- Connexion persistante
+- Messages sérialisés en MessagePack
+- Heartbeat 10s
+- Mode multiplexé
+
+- TCP Fast Open (TFO) pour réduire la latence d’établissement
+- Payload SYN strictement idempotent (client_hello, token, version)
+- Fallback automatique vers connect classique si TFO non supporté
+- Cookies TFO serveur activés et gérés par le kernel
+- Re‑séquençage applicatif : session_id + seq + ack + retransmission
+- Détection perte/défaillance initiale et renvoi après connexion établie
+- Configuration OS requise : `net.ipv4.tcp_fastopen=3` (client+serveur), backlog TFO
+- Load balancer (Nginx/Caddy) : activer TFO si disponible, respecter les fallbacks
+
+6.3 Présence
+- Tracking live de chaque utilisateur
+- Sessions multi‑device
+- Délai de reconnexion : 5s
+
+============================================================
+7. SYSTÈME D’AUTORISATION
+============================================================
+Permissions utilisateur :
+- Owner : tout
+- Admin :
+  - bannir
+  - ajouter
+  - supprimer messages
+  - changer photo groupe
+- User :
+  - envoyer messages
+  - envoyer médias
+  - modifier son profil
+- Banned :
+  - accès refusé
+
+============================================================
+8. API REST
+============================================================
+Endpoints principaux :
+- POST /auth/register
+- POST /auth/login
+- GET /users/me
+- PATCH /users/me/photo
+- POST /groups
+- POST /groups/:id/add
+- POST /groups/:id/kick
+- POST /groups/:id/ban
+- GET /groups/:id/messages?before=x
+- POST /messages/send
+- POST /upload
+
+============================================================
+9. ELECTRON – STRUCTURE DU TERMINAL
+============================================================
+- main.js : bootstrap
+- preload.js : bridge sécurisé
+- renderer/Terminal.tsx :
+  - Input command parser
+  - Display scroll zone
+- services/ws.ts : WebSocket wrapper
+- services/api.ts : REST client
+- store/session.ts : token storage
+- themes/terminal-dark.json
+- Key features :
+  - Auto scroll
+  - Command history
+  - Multi-tabs (DM/group)
+  - Drag & drop upload
+
+============================================================
+10. REACT NATIVE – STRUCTURE TERMINAL MOBILE
+============================================================
+- App.tsx
+- components/TerminalView.tsx
+- screens/Login.tsx
+- ws-client.js
+- RNFS pour upload local
+- SecureStore pour tokens
+- Push notifications (Expo ou native)
+
+============================================================
+11. PERFORMANCE OBJECTIVES
+============================================================
+- 1 million de connexions WebSocket concurrentes (cluster)
+- Latence message → broadcast < 20 ms
+- Upload 500 Mo possible
+- Streaming vidéo progressif
+- Reconnection en moins de 3 secondes
+
+============================================================
+12. EXTENSIONS FUTURES
+============================================================
+- Appels audio/vidéo P2P WebRTC
+- Système de bots internes
+- Messages auto‑désintégrables
+- Channels éphémères
+- Mode "incognito terminal"
